@@ -3,251 +3,201 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OWEN FILES | ENCRYPTED TERMINAL</title>
+    <title>OWEN FILES | ENCRYPTED</title>
     <style>
         :root {
-            --bg-dark: #0f0f0f;
-            --bg-panel: #141414;
-            --text-white: #ffffff;
-            --text-gray: #7a7a7a;
-            --red-accent: #ff3b3b;
-            --ios-green: #34c759;
-            --system-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            --terminal-font: "Courier New", Courier, monospace;
+            --bg: #0b0b0b;
+            --white: #ffffff;
+            --gray: #555;
+            --red: #ff3b3b;
+            --green: #34c759;
+            --font: "Courier New", Courier, monospace;
         }
 
-        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+        * { box-sizing: border-box; user-select: none; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: var(--bg); color: var(--white); font-family: var(--font); overflow: hidden; }
 
-        body, html {
-            margin: 0; padding: 0;
-            width: 100%; height: 100%;
-            background-color: var(--bg-dark);
-            color: var(--text-white);
-            font-family: var(--system-font);
-            overflow: hidden;
+        /* CONSTANT BACKGROUND ANIMATION (GLITCH SCANLINES) */
+        #bg-overlay {
+            position: fixed; inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none; z-index: 100;
         }
 
-        /* OLD TV SCANLINE OVERLAY */
-        #tv-scanlines {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: repeating-linear-gradient(
-                0deg,
-                rgba(0, 0, 0, 0.2),
-                rgba(0, 0, 0, 0.2) 1px,
-                transparent 1px,
-                transparent 2px
-            );
-            background-size: 100% 3px;
-            pointer-events: none;
-            z-index: 9999;
-            opacity: 0.25;
-            animation: lineScroll 10s linear infinite;
+        @keyframes noise {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(5px); }
+        }
+        #bg-overlay::after {
+            content: ""; position: absolute; inset: 0;
+            background: rgba(255,255,255,0.03);
+            animation: noise 0.2s infinite;
         }
 
-        @keyframes lineScroll { from { background-position: 0 0; } to { background-position: 0 100%; } }
+        .screen { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 30px; text-align: center; }
+        .active { display: flex; }
 
-        .screen-container {
-            position: absolute;
-            inset: 0;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            text-align: center;
-            opacity: 0;
-            transition: opacity 0.8s ease;
+        /* TYPEWRITER TEXT */
+        .typewriter { display: inline-block; text-align: left; max-width: 500px; font-size: 18px; line-height: 1.6; }
+
+        /* REDACTED BOXES */
+        .redact { background: #222; color: #222; padding: 0 5px; cursor: pointer; transition: 0.2s; }
+        .redact.revealed { background: transparent; color: var(--red); font-weight: bold; animation: textGlitch 0.3s infinite; }
+
+        @keyframes textGlitch {
+            0% { transform: skew(2deg); opacity: 1; }
+            50% { transform: skew(-2deg); opacity: 0.8; }
+            100% { transform: skew(0deg); opacity: 1; }
         }
 
-        .screen-active { display: flex; opacity: 1; z-index: 10; }
+        /* DIRECTORY LOCKING */
+        .dir-row { width: 100%; max-width: 400px; padding: 20px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; color: var(--gray); }
+        .unlocked { color: var(--white); cursor: pointer; border-left: 3px solid var(--red); background: rgba(255,0,0,0.05); }
 
-        /* JYNXZI STYLE LOCK SCREEN */
-        .lock-badge {
-            width: 90px; height: 90px;
-            border: 1px solid #2a2a2a; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 38px; color: var(--red-accent);
-            margin-bottom: 40px;
-            box-shadow: 0 0 30px rgba(255, 59, 59, 0.1);
-        }
+        /* BUTTONS */
+        .btn { margin-top: 30px; background: none; border: 1px solid var(--red); color: var(--red); padding: 10px 20px; cursor: pointer; display: none; text-transform: uppercase; letter-spacing: 2px; }
+        .btn:hover { background: var(--red); color: white; }
 
-        .lock-main-text {
-            font-size: 20px; font-weight: 700;
-            letter-spacing: 5px; text-transform: uppercase;
-            line-height: 1.5; max-width: 400px; margin-bottom: 20px;
-        }
-
-        .lock-sub-text {
-            color: var(--red-accent); font-size: 13px;
-            letter-spacing: 3px; text-transform: uppercase; font-weight: 600;
-        }
-
-        .lockdown-footer {
-            position: absolute; bottom: 40px;
-            font-family: var(--terminal-font);
-            color: var(--text-gray); font-size: 11px; letter-spacing: 1px;
-        }
-
-        /* CALL SCREEN */
-        .call-accept-btn {
-            width: 80px; height: 80px;
-            background-color: var(--ios-green);
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-size: 40px; color: white; cursor: pointer;
-            box-shadow: 0 0 30px rgba(52, 199, 89, 0.4);
-            animation: ringPulse 1.5s infinite;
-        }
-        @keyframes ringPulse { 0% {transform: scale(1);} 50% {transform: scale(1.1);} 100% {transform: scale(1);} }
-
-        /* DIRECTORY */
-        .dir-list { width: 100%; max-width: 450px; border-top: 1px solid #222; }
-        .dir-item {
-            display: flex; justify-content: space-between; padding: 25px 5px;
-            border-bottom: 1px solid #222; cursor: pointer; transition: 0.3s;
-        }
-        .dir-item:hover { background: rgba(255,255,255,0.03); }
-
-        /* CONTENT */
-        .content-area p { font-size: 20px; line-height: 1.8; color: #ccc; margin-bottom: 25px; text-align: left; }
-        .redacted {
-            background-color: #222; color: #222;
-            padding: 0 6px; border-radius: 2px; cursor: pointer;
-        }
-        .redacted.visible { background-color: transparent; color: var(--red-accent); font-weight: 700; }
-
-        .ui-btn {
-            background: none; border: 1px solid #333; color: var(--text-gray);
-            padding: 12px 25px; font-size: 12px; letter-spacing: 2px;
-            text-transform: uppercase; cursor: pointer; margin-top: 40px;
-        }
-        .ui-btn-critical { border-color: #441a1a; color: var(--red-accent); }
-
-        /* POSTER */
-        .poster-box {
-            border: 10px double #fff; background: #fff; color: #000;
-            padding: 30px; margin-top: 20px; font-family: "Arial Black", sans-serif;
-        }
-
-        #admin-input { position: fixed; top: 10px; right: 10px; z-index: 10000; }
-        #admin-input input { background: none; border: none; color: #111; width: 40px; outline: none; text-align: right;}
+        /* JYNXZI LOCK SCREEN */
+        .lock-icon { font-size: 50px; color: var(--red); margin-bottom: 20px; border: 1px solid #333; border-radius: 50%; width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; }
+        .timer { font-size: 24px; color: var(--gray); margin-top: 50px; }
     </style>
 </head>
 <body>
 
-    <div id="tv-scanlines"></div>
+    <div id="bg-overlay"></div>
 
-    <div id="admin-input"><input type="password" onchange="checkAdmin(this.value)"></div>
-
-    <section id="scr-lock" class="screen-container">
-        <div class="lock-badge">🔒</div>
-        <div class="lock-main-text">OWEN HAS SAID AND SHOWN ALL HE NEEDS TO.</div>
-        <div class="lock-sub-text">THANKS FOR LISTENING</div>
-        <div id="countdown-val" class="lockdown-footer">TERMINAL_WIPE: --:--:--</div>
+    <section id="scr-call" class="screen active">
+        <h1 style="font-size: 40px;">Unknown</h1>
+        <p style="color: var(--gray);">Incoming Cryptic Link...</p>
+        <div onclick="startSequence()" style="margin-top:50px; width:80px; height:80px; background:var(--green); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:30px;">📞</div>
     </section>
 
-    <section id="scr-call" class="screen-container">
-        <div style="font-size: 32px; margin-bottom: 10px;">Unknown</div>
-        <div style="color: var(--text-gray); margin-bottom: 80px;">connecting...</div>
-        <div class="call-accept-btn" onclick="acceptCall()">📞</div>
+    <section id="scr-dir" class="screen">
+        <h2 style="letter-spacing: 10px;">FILES</h2>
+        <div id="file-list" style="width:100%; display:flex; flex-direction:column; align-items:center;"></div>
     </section>
 
-    <section id="scr-dir" class="screen-container" style="justify-content: flex-start; padding-top: 100px;">
-        <h1 style="letter-spacing: 8px; margin-bottom: 50px;">DIRECTORY</h1>
-        <div class="dir-list">
-            <script>
-                for(let i=1; i<=7; i++) {
-                    document.write(`
-                        <div class="dir-item" onclick="showFile(${i})">
-                            <span>File 00${i}</span>
-                            <span style="color:var(--text-gray)">${i === 7 ? 'FINAL' : 'RECOVERED'}</span>
-                        </div>
-                    `);
-                }
-            </script>
-        </div>
+    <section id="scr-view" class="screen">
+        <div id="text-container" class="typewriter"></div>
+        <button id="next-btn" class="btn" onclick="goBack()">[ BACK TO FILES ]</button>
+        <button id="final-btn" class="btn" onclick="triggerLockdown()">[ TRANSMIT DATA ]</button>
     </section>
 
-    <section id="scr-view" class="screen-container">
-        <div id="file-body" class="content-area"></div>
-        <div id="file-footer"></div>
+    <section id="scr-lock" class="screen">
+        <div class="lock-icon">🔒</div>
+        <h2 style="letter-spacing: 3px;">OWEN HAS SAID AND SHOWN ALL HE NEEDS TO.</h2>
+        <p style="color:var(--red); font-weight:bold;">THANKS FOR LISTENING</p>
+        <div id="countdown" class="timer">TERMINAL_WIPE: --:--:--</div>
     </section>
 
-    <audio id="phone-audio" loop src="ring.mp3"></audio>
+    <audio id="ring" loop src="ring.mp3"></audio>
 
     <script>
+        let currentLevel = 1;
+        const totalFiles = 7;
         const STORY = {
-            1: "Zac was the heartbeat of the group. Laughing, planning, always there. Until he wasn't. The last person seen with him at the bar was <span class='redacted' onclick='reveal(this)'>Owen</span>.",
-            2: "Zac's car was found empty. The keys were still in the ignition. No struggle, no broken glass. Just a single footprint belonging to <span class='redacted' onclick='reveal(this)'>Owen</span>.",
-            3: "The burner phone logs show 42 messages sent in one hour. All of them were sent from a location registered to <span class='redacted' onclick='reveal(this)'>Owen</span>.",
-            4: "We found the jacket in the woods. It was shredded. Beside it lay a heavy flashlight engraved with the initials of <span class='redacted' onclick='reveal(this)'>Owen</span>.",
-            5: "The interrogation lasted ten hours. He didn't say a word. He just smiled every time we mentioned Zac's name. That was the true face of <span class='redacted' onclick='reveal(this)'>Owen</span>.",
-            6: "The basement held the final evidence. Zac's watch was found tucked under a loose floorboard in the home of <span class='redacted' onclick='reveal(this)'>Owen</span>.",
-            7: "The truth is finally out. Zac is gone, but the shadow remains. The transmission ends here."
+            1: "Everyone loved him. Friendly. Always floating around cracking jokes. Then one day... <span class='redact' onclick='reveal(this)'>Owen</span> stopped showing up.",
+            2: "Zac was the last one to see him. They were at the bridge. Zac says he left early, but the cameras show him being followed by <span class='redact' onclick='reveal(this)'>Owen</span>.",
+            3: "The car was found in a ravine. No blood. No struggle. Just a single glove belonging to <span class='redact' onclick='this.classList.add(\"revealed\"); checkNext(3)'>Owen</span>.",
+            4: "We checked the basement. The walls were covered in photos. Every single photo was of Zac. Taken by <span class='redact' onclick='reveal(this)'>Owen</span>.",
+            5: "The interrogation was a joke. He just sat there smiling. He knew we couldn't find the body. He knew he won. That monster is <span class='redact' onclick='reveal(this)'>Owen</span>.",
+            6: "A year later, a letter arrived. No return address. Just a coordinate and a name: <span class='redact' onclick='reveal(this)'>Owen</span>.",
+            7: "The coordinates lead to you. He's not gone. He's watching you right now. Signed, <span class='redact' onclick='reveal(this)'>Owen</span>."
         };
 
-        window.onload = () => {
-            if(localStorage.getItem('isLocked') === 'true') {
-                showScreen('scr-lock');
-                runTimer();
-            } else {
-                showScreen('scr-call');
-                document.getElementById('phone-audio').play().catch(()=>{});
+        function setScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function startSequence() {
+            document.getElementById('ring').pause();
+            renderDirectory();
+            setScreen('scr-dir');
+        }
+
+        function renderDirectory() {
+            const list = document.getElementById('file-list');
+            list.innerHTML = "";
+            for (let i = 1; i <= totalFiles; i++) {
+                const isUnlocked = i <= currentLevel;
+                const div = document.createElement('div');
+                div.className = `dir-row ${isUnlocked ? 'unlocked' : ''}`;
+                div.innerHTML = `<span>FILE_00${i}</span> <span>${isUnlocked ? '[OPEN]' : '[LOCKED]'}</span>`;
+                if (isUnlocked) div.onclick = () => openFile(i);
+                list.appendChild(div);
             }
-        };
-
-        function showScreen(id) {
-            document.querySelectorAll('.screen-container').forEach(s => s.classList.remove('screen-active'));
-            document.getElementById(id).classList.add('screen-active');
         }
 
-        function acceptCall() {
-            document.getElementById('phone-audio').pause();
-            showScreen('scr-dir');
+        function openFile(n) {
+            setScreen('scr-view');
+            const container = document.getElementById('text-container');
+            const btn = document.getElementById('next-btn');
+            const fBtn = document.getElementById('final-btn');
+            container.innerHTML = "";
+            btn.style.display = "none";
+            fBtn.style.display = "none";
+
+            // Typewriter effect
+            let i = 0;
+            let fullText = STORY[n];
+            container.innerHTML = fullText; // We inject HTML so the span works
+            container.style.opacity = 0; 
+            
+            // Fade in animation for text
+            let op = 0;
+            let timer = setInterval(() => {
+                if (op >= 1) clearInterval(timer);
+                container.style.opacity = op;
+                op += 0.1;
+            }, 50);
         }
 
-        function reveal(el) { el.classList.add('visible'); el.innerText = 'Owen'; }
-
-        function showFile(num) {
-            let html = `<p>${STORY[num]}</p>`;
-            if(num === 7) html += `<div class="poster-box"><h1>MISSING</h1><p>NAME: ZAC<br>LAST SEEN WITH: <span style="color:red">OWEN</span></p></div>`;
-            document.getElementById('file-body').innerHTML = html;
-
-            let footer = `<button class="ui-btn" onclick="showScreen('scr-dir')">[ BACK ]</button>`;
-            if(num === 7) footer += `<button class="ui-btn ui-btn-critical" onclick="lockDown()">[ TRANSMIT FINAL REPORT ]</button>`;
-            document.getElementById('file-footer').innerHTML = footer;
-            showScreen('scr-view');
+        function reveal(el) {
+            el.classList.add('revealed');
+            el.innerText = "Owen";
+            if (currentLevel < totalFiles) {
+                document.getElementById('next-btn').style.display = "block";
+                if (currentLevel < totalFiles) currentLevel++;
+            } else {
+                document.getElementById('final-btn').style.display = "block";
+            }
         }
 
-        function lockDown() {
-            const exp = new Date().getTime() + (4*60*60*1000);
-            localStorage.setItem('isLocked', 'true');
-            localStorage.setItem('lockExpiry', exp);
-            showScreen('scr-lock');
-            runTimer();
+        function goBack() {
+            renderDirectory();
+            setScreen('scr-dir');
         }
 
-        function runTimer() {
+        function triggerLockdown() {
+            localStorage.setItem('owen_locked', 'true');
+            localStorage.setItem('owen_expiry', new Date().getTime() + 14400000);
+            startLockdown();
+        }
+
+        function startLockdown() {
+            setScreen('scr-lock');
             setInterval(() => {
-                const diff = localStorage.getItem('lockExpiry') - new Date().getTime();
-                if(diff <= 0) { document.getElementById('countdown-val').innerText = "ARCHIVED"; return; }
-                const h = Math.floor(diff/3600000);
-                const m = Math.floor((diff%3600000)/60000);
-                const s = Math.floor((diff%60000)/1000);
-                document.getElementById('countdown-val').innerText = `TERMINAL_WIPE: ${h}:${m}:${s}`;
+                const now = new Date().getTime();
+                const expiry = localStorage.getItem('owen_expiry');
+                const diff = expiry - now;
+                if (diff <= 0) {
+                    document.getElementById('countdown').innerText = "SYSTEM PURGED";
+                    return;
+                }
+                const h = Math.floor(diff / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                const s = Math.floor((diff % 60000) / 1000);
+                document.getElementById('countdown').innerText = `TERMINAL_WIPE: ${h}:${m}:${s}`;
             }, 1000);
         }
 
-        function checkAdmin(v) { if(v === 'admin') { localStorage.clear(); location.reload(); } }
+        // Keep locked on refresh
+        if (localStorage.getItem('owen_locked') === 'true') {
+            window.onload = startLockdown;
+        }
     </script>
-
-    <div style="display:none">
-        <script>
-            for(let i=0; i<5000; i++) {
-                document.write(Math.random().toString(16).substring(2, 15));
-            }
-        </script>
-    </div>
 </body>
 </html>
